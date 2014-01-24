@@ -38,10 +38,10 @@ class Loaders
 				users[entry[0]] = {entry[1] => entry[2]}
 			end
 			#update average rating
-			if users[entry[0]][:avg]
-				users[entry[0]][:avg] = users[entry[0]][:avg].to_f * (1.0-1.0/users[entry[0]].length) + entry[2]/users[entry[0]].length.to_f
+			if users[entry[0]][:pop]
+				users[entry[0]][:pop] += entry[2]
 			else 
-				users[entry[0]][:avg] = entry[2].to_f
+				users[entry[0]][:pop] = entry[2]
 			end	
 		end
 		return users
@@ -57,10 +57,10 @@ class Loaders
 				movies[entry[1]] = {entry[0] => entry[2]}
 			end
 			#update average rating
-			if movies[entry[1]][:avg]
-				movies[entry[1]][:avg] = movies[entry[1]][:avg].to_f * (1.0-1.0/movies[entry[1]].length) + entry[2]/movies[entry[1]].length.to_f
+			if movies[entry[1]][:pop]
+				movies[entry[1]][:pop] += entry[2]
 			else 
-				movies[entry[1]][:avg] = entry[2].to_f
+				movies[entry[1]][:pop] = entry[2]
 			end	
 		end
 		return movies
