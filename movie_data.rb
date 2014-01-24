@@ -1,123 +1,95 @@
 #Evan Fader
+require_relative "loaders"
+require_relative "movie_test"
 
-class MovieRating	
-	def initialize
-		@raw_data = []
-		@popularity = {}
-		@users = {}
+class MovieData
+	def initialize(path, sample=nil)
+		loader = Loaders.new
+		@sample = sample
+		@path = path
+		@raw_data = loader.load_data(path, sample)
+		@movies = loader.load_movies(@raw_data)
+		@users = loader.load_users(@raw_data)
+		@time = 0
 	end
 
-	def load_data
-		# puts raw data into an array
-		@raw_data = []
-		File.open('ml-100k/u.data') do |file|
-			file.each_line do |line|
-				@raw_data << line.split.map(&:to_i)
-			end
+	def rating(user, movie)
+		if @users[user] && @users[user][movie]
+			return @users[user][movie]
+		else
+			return 0
 		end
 	end
 
-	def load_users
-		@users = {}
-		@raw_data.each do |entry|
-			if @users[entry[0]]
-				@users[entry[0]][entry[1]] = entry[2]
-			else
-				@users[entry[0]] = {}
-				@users[entry[0]][entry[1]] = entry[2]
-			end
+	def predict(user,movie)
+		# the prediction is based on the average review for the movie
+		# and partially adjusted based on the average review of the user
+		if @movies[movie] && @movies[movie][:pop]
+			movieavg = @movies[movie][:pop].to_f / (@movies[movie].length-1).to_f
+			useravg = @users[user][:pop].to_f / (@users[user].length-1).to_f
+			return movieavg + (useravg - 3.55)*0.75
 		end
 	end
 
-	def load_popularities
-		# puts popularities into a hash by movie id
-		# popularities are determined by combined total ratings on
-		# a scale from -2 to 2, figuring that a rating of 1 or 2
-		# should detract from a movie's overall popularity
-		# 'popularity' suggests favoring movies that have been
-		# viewed the most in addition to being well liked, so
-		# this system is appropriate
-		@popularity = {}
-		@raw_data.each do |entry|
-			if @popularity[entry[1]]
-				@popularity[entry[1]] += entry[2] - 3
-			else
-				@popularity[entry[1]] = entry[2] - 3
-			end
-		end
-		@popularity = @popularity.sort_by {|movie_id, rating| rating}.reverse
+	def benchmark
+		return @time
 	end
 
-	def popularity(movie_id)
-		return @popularity[movie_id]
-	end
-
-	def popularity_list
-		return @popularity
-	end
-
-	def users
-		return @users
-	end
-
-	def similarity(user1, user2)
-		# Similarity is determined by adding up the ratings for
-		# all movies shared by both users, adjusted for
-		# difference in rating
-		factor = 0
-		@users[user1].each_pair do |movie1, rating1|
-			@users[user2].each_pair do |movie2, rating2|
-				if movie1 == movie2
-					factor += (5 - (rating1-rating2).abs)
+	def movies(user)
+		array = []
+		if @users[user]
+			@users[user].each_pair do |movie, rating|
+				if user != :pop
+					# ignore popularity field
+					array << movie
 				end
 			end
 		end
-		return factor
+		return array
 	end
 
-	def most_similar(user1)
-		# Finds the most similar user or users to the given user
-		best_fit = 0
-		partners = []
-		@users.each_pair do |user2, movie|
-			if user1 != user2
-				this_fit = similarity(user1, user2)
-				if this_fit > best_fit
-					best_fit = this_fit
-					partners = [user2]
-				elsif this_fit == best_fit
-					partners << user2
+	def viewers(movie)
+		array = []
+		if @movies[movie]
+			@movies[movie].each_pair do |user, rating|
+				if user != :pop
+					# ignore popularity field
+					array << user
 				end
 			end
 		end
-		return partners
+		return array
 	end
 
-end
-
-instance = MovieRating.new
-instance.load_data
-instance.load_popularities
-instance.load_users
-
-puts "Most popular movies:"
-a = instance.popularity_list
-i = 0
-a.each do |b|
-	if i < 10
-		puts b[0]
-		i += 1
-	end
-end
-
-puts "Most unpopular movies:"
-i = 0
-a.reverse.each do |b|
-	if i < 10
-		puts b[0]
-		i += 1
+	def run_test(k=0)
+		if !@sample
+			return
+		end
+		loader = Loaders.new
+		test_data = loader.load_test(@path, @sample)
+		if k !=0
+			# limit test to k trials unless k is zero or unspecified
+			test_data = test_data.first(k)
+		end
+		# start time for benchmarking
+		@time = Time.now
+		test_data.each do |entry|
+			#change unused timestamp field to prediction field
+			entry[3] = predict(entry[0],entry[1])
+		
+		#end time for benchmarking
+		@time = (Time.now - @time) / test_data.length
+		return test_data
 	end
 end
 
-puts "Most similar user(s) to user 1:"
-puts instance.most_similar(1).inspect
+instance = MovieData.new('ml-100k',:u1)
+tester = MovieTest.new(instance.run_test)
+puts "The mean error is:"
+puts tester.mean
+puts "The standard deviation is:"
+puts tester.stdev
+puts "The root mean square is:"
+puts tester.rms
+puts "The average time for running each prediction is:"
+puts instance.benchmark
