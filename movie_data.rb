@@ -10,7 +10,6 @@ class MovieData
 		@raw_data = loader.load_data(path, sample)
 		@movies = loader.load_movies(@raw_data)
 		@users = loader.load_users(@raw_data)
-		@time = 0
 	end
 
 	def rating(user, movie)
@@ -71,25 +70,24 @@ class MovieData
 			# limit test to k trials unless k is zero or unspecified
 			test_data = test_data.first(k)
 		end
-		# start time for benchmarking
-		@time = Time.now
 		test_data.each do |entry|
 			#change unused timestamp field to prediction field
 			entry[3] = predict(entry[0],entry[1])
-		
-		#end time for benchmarking
-		@time = (Time.now - @time) / test_data.length
+		end
 		return test_data
 	end
 end
-
+time = Time.now
 instance = MovieData.new('ml-100k',:u1)
-tester = MovieTest.new(instance.run_test)
+tester = MovieTest.new(instance.run_test(0))
+time = Time.now - time
 puts "The mean error is:"
 puts tester.mean
 puts "The standard deviation is:"
 puts tester.stdev
 puts "The root mean square is:"
 puts tester.rms
-puts "The average time for running each prediction is:"
-puts instance.benchmark
+puts "The total time for running the program is:"
+puts time
+puts "The time per prediction is:"
+puts time / 20000
